@@ -1,0 +1,77 @@
+menu "SARA R4 COnfigurations"
+
+config SARA_UART_NUM_SELECTION_ENABLED
+	bool "Enable UART port selection"
+	default false
+	help
+		This will enable port selection
+		
+choice
+    depends on SARA_UART_NUM_SELECTION_ENABLED
+    prompt "UART port to use ?"
+    config USE_UART_0
+          bool "UART 0"
+    config USE_UART_1
+          bool "UART 1"
+endchoice
+
+config SARA_UART_HW_CONTROL_SELECTION_ENABLED
+	bool "Enable UART hardware flow control selection"
+	default false
+	help
+		This will enable port selection
+		
+choice
+    depends on SARA_UART_HW_CONTROL_SELECTION_ENABLED
+    prompt "flow control to use ?"
+    config SARA_UART_USE_RTS
+         bool "RTS"
+    config SARA_UART_USE_CTS
+        bool "CTS"
+    config SARA_UART_USE_RTS_CTS
+        bool "RTS CTS"
+    config SARA_UART_USE_MAX
+        bool "MAX"
+    config SARA_UART_USE_DISABLE
+        bool "Disable"
+ endchoice
+
+config SARA_BUFFER_SIZE
+    int "Default SARA Buffer Size"
+    default 1024
+    help
+        This buffer size using for both transmit and receive
+
+config SARA_UART_TX_PIN
+    int "Default UART TX Pin"
+    default 26
+    help
+        Pin for UART transmit
+
+config SARA_UART_RX_PIN
+    int "Default UART RX Pin"
+    default 25
+    help
+        Pin for UART receive
+
+config SARA_UART_RTS_PIN
+    int "Default UART RTS Pin"
+    default -1
+    help
+        Pin for UART RTS
+
+config SARA_UART_DTR_PIN
+    int "Default UART TX Pin"
+    default -1
+    help
+        Pin for UART DTR
+
+config SARA_UART_BAUD
+    int "Default UART TX Pin"
+    default 115200
+    help
+        UART Baud Rate
+
+
+
+endmenu
