@@ -121,7 +121,7 @@ static void esp_sara_task(void *param)
         if (no_signal_counter > 10)
         {
             no_signal_counter = 0;
-            
+            esp_sara_req_attach(0);
             esp_sara_set_function(15);
             vTaskDelay(10000 / portTICK_PERIOD_MS);
         }

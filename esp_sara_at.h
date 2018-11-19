@@ -31,6 +31,8 @@ void esp_sara_uart_init();
 
 esp_err_t esp_sara_disable_echo();
 
+esp_err_t esp_sara_req_attach(bool attach);
+
 esp_err_t esp_sara_is_connected();
 esp_err_t esp_sara_set_apn(const char *apn);
 esp_err_t esp_sara_set_rat(int rat);

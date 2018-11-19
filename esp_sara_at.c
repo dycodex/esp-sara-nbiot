@@ -147,7 +147,16 @@ void esp_sara_uart_init()
 
 esp_err_t esp_sara_disable_echo()
 {
-    return esp_sara_send_at_command("ATE0\r\n", 7);
+    esp_sara_send_at_command("ATE0\r\n", 7);
+    return esp_sara_wait_irc(1000);
+}
+
+esp_err_t esp_sara_req_attach(bool attach)
+{
+    char cmd[32];
+    int len = sprintf(cmd, "AT+CGATT=%d\r\n", attach);
+    esp_sara_send_at_command(cmd, strlen(cmd));
+    return esp_sara_wait_irc(1000);
 }
 
 esp_err_t esp_sara_check_signal()
