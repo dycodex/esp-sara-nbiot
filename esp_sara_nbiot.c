@@ -34,6 +34,7 @@ struct esp_sara_client
     TaskHandle_t esp_sara_transport_task_handle;
     esp_sara_event_callback_t event_handle;
     esp_sara_transport_t transport;
+    esp_sara_transport_config_t transport_config;
     esp_sara_state_t cgatt;
     esp_sara_mqtt_state_t mqtt_state;
     esp_sara_config_storage_t *config;
@@ -43,7 +44,7 @@ struct esp_sara_client
 static void esp_sara_task(void *param);
 static void esp_sara_event_task(void *param);
 
-static esp_err_t esp_sara_config_mqtt(esp_sara_client_handle_t *client, esp_sara_mqtt_client_config_t *config);
+static esp_err_t esp_sara_config_mqtt(esp_sara_client_handle_t * client);
 
 esp_sara_client_handle_t *esp_sara_client_init(esp_sara_client_config_t *config)
 {
@@ -60,6 +61,7 @@ esp_sara_client_handle_t *esp_sara_client_init(esp_sara_client_config_t *config)
     client->config->use_hex = config->use_hex;
     client->config->buffer_size = SARA_BUFFER_SIZE;
     client->transport = config->transport;
+    client->transport_config = config->transport_config;
     return client;
 }
 
@@ -106,8 +108,8 @@ static void esp_sara_task(void *param)
         case SARA_TRANSPORT_MQTT:
             if (client->cgatt == 1 && client->mqtt_state == SARA_MQTT_DISCONNECTED)
             {
-                esp_sara_config_mqtt(client, (esp_sara_mqtt_client_config_t *)client->config);
-                esp_sara_login_mqtt(client);
+                esp_sara_config_mqtt(client);
+                //esp_sara_login_mqtt(client);
             }
             break;
         default:
@@ -119,11 +121,11 @@ static void esp_sara_task(void *param)
         if (no_signal_counter > 10)
         {
             no_signal_counter = 0;
-            esp_sara_set_function(4);
+            
+            esp_sara_set_function(15);
             vTaskDelay(10000 / portTICK_PERIOD_MS);
-            esp_sara_set_function(1);
         }
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        vTaskDelay(10000 / portTICK_PERIOD_MS);
     }
 }
 
@@ -207,8 +209,9 @@ static void esp_sara_event_task(void *param)
     }
 }
 
-esp_err_t esp_sara_config_mqtt(esp_sara_client_handle_t *client, esp_sara_mqtt_client_config_t *config)
+esp_err_t esp_sara_config_mqtt(esp_sara_client_handle_t * client)
 {
+    esp_sara_mqtt_client_config_t * config = (esp_sara_mqtt_client_config_t*) client->transport_config;
     esp_sara_set_mqtt_client_id(config->client_id);
     esp_sara_set_mqtt_server(config->host, config->port);
     esp_sara_set_mqtt_timeout(config->timeout);
@@ -217,7 +220,8 @@ esp_err_t esp_sara_config_mqtt(esp_sara_client_handle_t *client, esp_sara_mqtt_c
 
 esp_err_t esp_sara_login_mqtt(esp_sara_client_handle_t *client)
 {
-    return esp_sara_send_at_command("AT+UMQTTC=1\r\n", 14);
+    esp_sara_send_at_command("AT+UMQTTC=1\r\n", 14);
+    return esp_sara_wait_irc(30000);
 }
 
 esp_err_t esp_sara_logout_mqtt(esp_sara_client_handle_t *client)

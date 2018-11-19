@@ -7,7 +7,8 @@
 #include "freeRTOS/event_groups.h"
 
 QueueHandle_t at_queue;
-EventGroupHandle_t irc_event_group;
+SemaphoreHandle_t uart_semaphore;
+TaskHandle_t uart_task_handle;
 
 typedef struct
 {
@@ -43,5 +44,6 @@ esp_err_t esp_sara_set_mqtt_server(const char *server, int port);
 esp_err_t esp_sara_set_mqtt_timeout(uint16_t timeout);
 
 esp_err_t esp_sara_send_at_command(const char *command, int len);
+esp_err_t esp_sara_wait_irc(int timeout);
 
 #endif
