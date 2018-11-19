@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include "esp_sara_config.h"
 #include "esp_sara_at.h"
-#include "esp_sara.h"
+#include "esp_sara_nbiot.h"
 #include "freeRTOS/FreeRTOS.h"
 #include "string.h"
 
@@ -42,7 +42,6 @@ struct esp_sara_client
 
 static void esp_sara_task(void *param);
 static void esp_sara_event_task(void *param);
-static void esp_sara_mqtt_task(void *param);
 
 static esp_err_t esp_sara_config_mqtt(esp_sara_client_handle_t *client, esp_sara_mqtt_client_config_t *config);
 
@@ -61,19 +60,6 @@ esp_sara_client_handle_t *esp_sara_client_init(esp_sara_client_config_t *config)
     client->config->use_hex = config->use_hex;
     client->config->buffer_size = SARA_BUFFER_SIZE;
     client->transport = config->transport;
-
-    switch (client->transport)
-    {
-    case SARA_TRANSPORT_TCP:
-        break;
-    case SARA_TRANSPORT_UDP:
-        break;
-    case SARA_TRANSPORT_MQTT:
-        esp_sara_config_mqtt(client, (esp_sara_mqtt_client_config_t *)config->transport_config);
-        break;
-    default:
-        break;
-    }
     return client;
 }
 
@@ -81,18 +67,6 @@ esp_err_t esp_sara_start(esp_sara_client_handle_t *client)
 {
     xTaskCreate(esp_sara_task, "esp_sara_task", 4096, client, 5, client->esp_sara_task_handle);
     xTaskCreate(esp_sara_event_task, "esp_sara_event_task", 4096, client, 5, client->esp_sara_event_task_handle);
-    switch (client->transport)
-    {
-    case SARA_TRANSPORT_TCP:
-        break;
-    case SARA_TRANSPORT_UDP:
-        break;
-    case SARA_TRANSPORT_MQTT:
-        xTaskCreate(esp_sara_mqtt_task, "esp_sara_mqtt_task", 4096, client, 5, client->esp_sara_transport_task_handle);
-        break;
-    default:
-        break;
-    }
     return ESP_OK;
 }
 
@@ -102,24 +76,6 @@ esp_err_t esp_sara_stop(esp_sara_client_handle_t *client)
     vTaskDelete(client->esp_sara_event_task_handle);
     free(client);
     return ESP_OK;
-}
-
-static void esp_sara_mqtt_task(void *param)
-{
-    esp_sara_client_handle_t *client = (esp_sara_client_handle_t *)param;
-
-    while (1)
-    {
-        if (client->cgatt == 1)
-        {
-            if (client->mqtt_state == SARA_MQTT_DISCONNECTED)
-            {
-                esp_sara_login_mqtt(client);
-            }
-        }
-
-        vTaskDelay(30000 / portTICK_PERIOD_MS);
-    }
 }
 
 static void esp_sara_task(void *param)
@@ -148,13 +104,19 @@ static void esp_sara_task(void *param)
         case SARA_TRANSPORT_UDP:
             break;
         case SARA_TRANSPORT_MQTT:
+            if (client->cgatt == 1 && client->mqtt_state == SARA_MQTT_DISCONNECTED)
+            {
+                esp_sara_config_mqtt(client, (esp_sara_mqtt_client_config_t *)client->config);
+                esp_sara_login_mqtt(client);
+            }
             break;
         default:
             break;
         }
-        if(client->csq > 31) no_signal_counter++;
+        if (client->csq > 31)
+            no_signal_counter++;
 
-        if(no_signal_counter > 10)
+        if (no_signal_counter > 10)
         {
             no_signal_counter = 0;
             esp_sara_set_function(15);
@@ -226,7 +188,7 @@ static void esp_sara_event_task(void *param)
                         int result = atoi(ch);
                         bool mqtt_state = result == 0;
 
-                        if(mqtt_state != client->mqtt_state)
+                        if (mqtt_state != client->mqtt_state)
                         {
                             event.event_id = SARA_EVENT_MQTT_CONNECTED;
                             should_callback = true;
