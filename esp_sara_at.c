@@ -59,15 +59,12 @@ static void esp_sara_read_at_response(void *param)
             uint8_t data[length + 1];
             data[length] = '\0';
             int len = uart_read_bytes(SARA_UART_NUM, (uint8_t *)data, length, 5000);
+            ESP_LOGI(TAG, "%s", data);
+
             char rc[SARA_BUFFER_SIZE];
             esp_err_t err = esp_sara_at_parser((const char *)&data, &rc);
-            if(err == ESP_ERR_INVALID_RESPONSE)
+            if (err != ESP_ERR_NOT_SUPPORTED)
             {
-                continue;
-            }
-            else if (err == ESP_OK)
-            {
-                ESP_LOGI(TAG, "%s", rc);
                 xEventGroupSetBits(irc_event_group, SARA_AT_OK);
                 if (strlen(rc) > 0)
                 {
@@ -115,6 +112,11 @@ void esp_sara_uart_init()
     irc_event_group = xEventGroupCreate();
     xTaskCreate(esp_sara_read_at_response, "sara_rx_task", 4096, NULL, 5, NULL);
     ESP_LOGI(TAG, "esp_sara_uart_client_handle_t init");
+}
+
+esp_err_t esp_sara_disable_echo()
+{
+    return esp_sara_send_at_command("ATE0\r\n", 7);
 }
 
 esp_err_t esp_sara_check_signal()

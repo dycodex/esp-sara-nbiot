@@ -89,7 +89,7 @@ static void esp_sara_task(void *param)
     //vTaskDelay(3000/portTICK_PERIOD_MS);
     esp_sara_set_apn(client->config->apn);
     esp_sara_set_rat(client->config->rat);
-
+    esp_sara_disable_echo();
     int no_signal_counter = 0;
     while (1)
     {
@@ -119,8 +119,9 @@ static void esp_sara_task(void *param)
         if (no_signal_counter > 10)
         {
             no_signal_counter = 0;
-            esp_sara_set_function(15);
-            vTaskDelay(9000 / portTICK_PERIOD_MS);
+            esp_sara_set_function(4);
+            vTaskDelay(10000 / portTICK_PERIOD_MS);
+            esp_sara_set_function(1);
         }
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
