@@ -5,9 +5,8 @@
 
 static const char *TAG = "SARA_AT";
 
-static esp_err_t esp_sara_at_parser(const char *resp, char *result)
+static esp_err_t esp_sara_at_parser(char *resp, char *result)
 {
-    const char *TAG = "SARA_PARSER";
     esp_err_t err = ESP_ERR_INVALID_RESPONSE;
     char *ch = strtok(resp, "\r\n");
     while (ch != NULL)
@@ -37,7 +36,7 @@ static void esp_sara_read_at_response(void *param)
     vTaskDelay(1000 / portTICK_PERIOD_MS);
     while (1)
     {
-        if (xSemaphoreTake(uart_semaphore, 5000/portTICK_PERIOD_MS) == pdTRUE)
+        if (xSemaphoreTake(uart_semaphore, 5000 / portTICK_PERIOD_MS) == pdTRUE)
         {
             int retry = 0;
             bool done = false;
@@ -51,7 +50,7 @@ static void esp_sara_read_at_response(void *param)
                 {
                     uint8_t data[length];
                     data[0] = '\0';
-                    int len = uart_read_bytes(SARA_UART_NUM, (uint8_t *)data, length, 5000);
+                    uart_read_bytes(SARA_UART_NUM, (uint8_t *)data, length, 5000);
                     ESP_LOGI(TAG, "%s", data);
                     strcat(message, (char *)data);
                     if (strstr(message, "\r\n") != NULL)
@@ -65,7 +64,7 @@ static void esp_sara_read_at_response(void *param)
             char rc[SARA_BUFFER_SIZE];
             memset(rc, '\0', SARA_BUFFER_SIZE);
 
-            esp_err_t err = esp_sara_at_parser((const char *)&message, &rc);
+            esp_err_t err = esp_sara_at_parser((char *)&message, (char*)&rc);
             if (err != ESP_ERR_NOT_SUPPORTED)
             {
                 if (strlen(rc) > 0)
@@ -88,7 +87,7 @@ static void esp_sara_read_at_response(void *param)
 static esp_err_t esp_sara_wait_irc(int timeout)
 {
     esp_err_t err = ESP_ERR_TIMEOUT;
-    int length = 0, retry = 0;
+    int length = 0;
     bool done = false;
     char message[SARA_BUFFER_SIZE] = {'\0'};
     while (!done)
@@ -97,7 +96,7 @@ static esp_err_t esp_sara_wait_irc(int timeout)
         uart_get_buffered_data_len(SARA_UART_NUM, (size_t *)&length);
         if (length > 0)
         {
-            int len = uart_read_bytes(SARA_UART_NUM, (uint8_t *)data, length, 5000 / portTICK_PERIOD_MS);
+            uart_read_bytes(SARA_UART_NUM, (uint8_t *)data, length, 5000 / portTICK_PERIOD_MS);
             strcat(message, (const char *)data);
             if ((strstr(message, "OK") != NULL) || (strstr(message, "ERROR") != NULL))
             {
@@ -111,7 +110,7 @@ static esp_err_t esp_sara_wait_irc(int timeout)
     ESP_LOGI(TAG, "%s", message);
 
     char rc[SARA_BUFFER_SIZE];
-    err = esp_sara_at_parser((const char *)&message, &rc);
+    err = esp_sara_at_parser((char *)&message, (char*)&rc);
     if (err != ESP_ERR_NOT_SUPPORTED)
     {
         if (strlen(rc) > 0)
@@ -136,7 +135,7 @@ esp_err_t esp_sara_send_at_command(const char *command, int len, int timeout)
     {
         char *TAG = "SARA_TX";
         uart_wait_tx_done(SARA_UART_NUM, 1000);
-        int txBytes = uart_write_bytes(SARA_UART_NUM, command, len);
+        uart_write_bytes(SARA_UART_NUM, command, len);
         ESP_LOGI(TAG, "%s", command);
         err = esp_sara_wait_irc(timeout);
     }
@@ -145,14 +144,14 @@ esp_err_t esp_sara_send_at_command(const char *command, int len, int timeout)
 
 void esp_sara_uart_init()
 {
-    uart_config_t uart_config = {};
-    uart_config.baud_rate = SARA_UART_BAUD;
-    uart_config.data_bits = UART_DATA_8_BITS;
-    uart_config.parity = UART_PARITY_DISABLE;
-    uart_config.stop_bits = UART_STOP_BITS_1;
-    uart_config.flow_ctrl = SARA_UART_HW_CONTROL;
-    uart_config.rx_flow_ctrl_thresh = 122;
-
+    uart_config_t uart_config = {
+        .baud_rate = SARA_UART_BAUD,
+        .data_bits = UART_DATA_8_BITS,
+        .parity = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = SARA_UART_HW_CONTROL,
+        .rx_flow_ctrl_thresh = 122,
+    };
     ESP_ERROR_CHECK(uart_param_config(SARA_UART_NUM, &uart_config));
     ESP_ERROR_CHECK(uart_set_pin(SARA_UART_NUM, SARA_UART_TX_PIN, SARA_UART_RX_PIN, SARA_UART_RTS_PIN, SARA_UART_DTR_PIN));
     ESP_ERROR_CHECK(uart_driver_install(SARA_UART_NUM, SARA_BUFFER_SIZE * 2, SARA_BUFFER_SIZE, SARA_BUFFER_SIZE, NULL, 0));
@@ -172,7 +171,7 @@ esp_err_t esp_sara_req_attach(bool attach)
 {
     char cmd[32];
     int len = sprintf(cmd, "AT+CGATT=%d\r\n", attach);
-    return esp_sara_send_at_command(cmd, strlen(cmd), 60000);
+    return esp_sara_send_at_command(cmd, len, 60000);
 }
 
 esp_err_t esp_sara_check_signal()
@@ -209,9 +208,9 @@ esp_err_t esp_sara_set_rat(int rat)
 
 esp_err_t esp_sara_set_function(int fun)
 {
-    const char cmd[32];
+    char cmd[32];
     int len = sprintf(cmd, "AT+CFUN=%d\r\n", fun);
-    return esp_sara_send_at_command(cmd, strlen(cmd), 1000);
+    return esp_sara_send_at_command(cmd, len, 1000);
 }
 
 esp_err_t esp_sara_set_mqtt_client_id(const char *client_id)
@@ -242,4 +241,10 @@ esp_err_t esp_sara_ping_mqtt_server(const char *server)
     char cmd[64];
     int len = sprintf(cmd, "AT+UMQTTC=8,\"%s\"\r\n", server);
     return esp_sara_send_at_command(cmd, len, 1000);
+}
+
+esp_err_t esp_sara_mqtt_read_message()
+{
+    const char *cmd = "AT+UMQTTC=6\r\n";
+    return esp_sara_send_at_command(cmd, strlen(cmd), 1000);
 }

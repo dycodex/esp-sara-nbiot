@@ -29,11 +29,12 @@ typedef enum
 
 typedef enum
 {
-    SARA_UMQTTC_OP_LOGIN = 1,
     SARA_UMQTTC_OP_LOGOUT = 0,
+    SARA_UMQTTC_OP_LOGIN = 1,
+    SARA_UMQTT_OP_PUBLISH = 2,
     SARA_UMQTTC_OP_SUBSCRIBE = 4,
-    SARA_UMQTT_OP_PUBLISH = 2
-} esp_sara_umqtt_op_t;
+    SARA_UMQTTC_OP_MESSAGE = 6,
+} esp_sara_umqttc_op_t;
 
 struct esp_sara_client
 {
@@ -53,6 +54,8 @@ static void esp_sara_task(void *param);
 static void esp_sara_event_task(void *param);
 
 static esp_err_t esp_sara_config_mqtt(esp_sara_client_handle_t *client);
+static esp_err_t esp_sara_login_mqtt(esp_sara_client_handle_t * client);
+static esp_err_t esp_sara_logout_mqtt(esp_sara_client_handle_t * client);
 
 esp_sara_client_handle_t *esp_sara_client_init(esp_sara_client_config_t *config)
 {
@@ -126,6 +129,7 @@ static void esp_sara_task(void *param)
                 else
                 {
                     esp_sara_ping_mqtt_server(((esp_sara_mqtt_client_config_t *)client->transport_config)->host);
+                    esp_sara_mqtt_read_message();
                 }
             }
             break;
