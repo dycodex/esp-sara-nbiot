@@ -107,8 +107,10 @@ static void esp_sara_task(void *param)
     esp_sara_set_rat(client->config->rat);
 
     int no_signal_counter = 0;
+    TickType_t xLastWakeup, xLastPing = xTaskGetTickCount();
     while (1)
     {
+        xLastWakeup = xTaskGetTickCount();
         esp_sara_check_signal();
         esp_sara_is_connected();
         switch (client->transport)
@@ -124,11 +126,21 @@ static void esp_sara_task(void *param)
                 if (client->mqtt_state == SARA_MQTT_DISCONNECTED)
                 {
                     esp_sara_config_mqtt(client);
-                    esp_sara_login_mqtt(client);
+                    /* esp_sara_login_mqtt(client);
+                    if(client->mqtt_state == SARA_MQTT_DISCONNECTED)
+                    {
+                        no_signal_counter++;
+                    }
+                    xLastPing = xTaskGetTickCount(); */
                 }
                 else
                 {
-                    esp_sara_ping_mqtt_server(((esp_sara_mqtt_client_config_t *)client->transport_config)->host);
+                    TickType_t now;
+                    if((now = xTaskGetTickCount()) - xLastPing > 30000)
+                    {
+                        esp_sara_ping_mqtt_server(((esp_sara_mqtt_client_config_t *)client->transport_config)->host);
+                        xLastPing = now;
+                    }
                     esp_sara_mqtt_read_message();
                 }
             }
@@ -139,10 +151,9 @@ static void esp_sara_task(void *param)
         if (client->csq > 31)
             no_signal_counter++;
 
-        if (no_signal_counter > 10)
+        if (no_signal_counter > 6)
         {
             no_signal_counter = 0;
-            esp_sara_req_attach(0);
             esp_sara_set_function(15);
             vTaskDelay(10000 / portTICK_PERIOD_MS);
         }
@@ -328,10 +339,10 @@ esp_err_t esp_sara_unsubscribe_mqtt(esp_sara_client_handle_t *client, const char
     return esp_sara_send_at_command(cmd, len, 1000);
 }
 
-esp_err_t esp_sara_publish_mqtt(esp_sara_client_handle_t *client, const char *topic, uint8_t *data, bool use_hex, int qos, int retain)
+esp_err_t esp_sara_publish_mqtt(esp_sara_client_handle_t *client, const char *topic, char *data, bool use_hex, int qos, int retain)
 {
     char cmd[1024];
-    int len = 0;
+    int len = strlen(data);
     if (use_hex)
     {
         char hex[len * 2];

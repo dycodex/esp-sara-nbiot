@@ -65,9 +65,10 @@ esp_sara_client_handle_t * esp_sara_client_init(esp_sara_client_config_t *config
 esp_err_t esp_sara_start(esp_sara_client_handle_t * client);
 esp_err_t esp_sara_stop(esp_sara_client_handle_t * client);
 
+/* UBLOX SARA R4 MQTTT */
 esp_err_t esp_sara_subscribe_mqtt(esp_sara_client_handle_t * client, const char * topic, int qos);
 esp_err_t esp_sara_unsubscribe_mqtt(esp_sara_client_handle_t * client, const char * topic);
-esp_err_t esp_sara_publish_mqtt(esp_sara_client_handle_t * client, const char * topic, uint8_t * data, bool use_hex, int qos, int retain);
+esp_err_t esp_sara_publish_mqtt(esp_sara_client_handle_t * client, const char * topic, char * data, bool use_hex, int qos, int retain);
 
 
 #ifdef __cplusplus
