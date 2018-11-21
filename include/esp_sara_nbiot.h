@@ -19,6 +19,7 @@ typedef enum {
     SARA_EVENT_PUBLISHED,
     SARA_EVENT_PUBLISH_FAILED,
     SARA_EVENT_DATA,
+    SARA_EVENT_MQTT_DATA,
     SARA_EVENT_SOCKET_CREATED,
     SARA_EVENT_SOCKET_CLOSED,
     SARA_EVENT_MQTT_CONNECTED,
@@ -39,6 +40,7 @@ typedef struct {
     uint32_t port;
     const char * client_id;
     uint16_t timeout;
+    bool clean_session;
 } esp_sara_mqtt_client_config_t;
 
 typedef struct {
@@ -46,6 +48,7 @@ typedef struct {
     esp_sara_client_handle_t * client;
     int payload_size;
     uint8_t payload[1024];
+    char topic[64];
 } esp_sara_event_handle_t;
 
 typedef esp_err_t (*esp_sara_event_callback_t)(esp_sara_event_handle_t * event);

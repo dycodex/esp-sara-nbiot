@@ -52,10 +52,11 @@ struct esp_sara_client
 
 static void esp_sara_task(void *param);
 static void esp_sara_event_task(void *param);
+static void esp_sara_mqtt_task(void *param);
 
 static esp_err_t esp_sara_config_mqtt(esp_sara_client_handle_t *client);
-static esp_err_t esp_sara_login_mqtt(esp_sara_client_handle_t * client);
-static esp_err_t esp_sara_logout_mqtt(esp_sara_client_handle_t * client);
+static esp_err_t esp_sara_login_mqtt(esp_sara_client_handle_t *client);
+static esp_err_t esp_sara_logout_mqtt(esp_sara_client_handle_t *client);
 
 esp_sara_client_handle_t *esp_sara_client_init(esp_sara_client_config_t *config)
 {
@@ -79,7 +80,22 @@ esp_sara_client_handle_t *esp_sara_client_init(esp_sara_client_config_t *config)
 esp_err_t esp_sara_start(esp_sara_client_handle_t *client)
 {
     xTaskCreate(esp_sara_task, "esp_sara_task", 4096, client, 5, client->esp_sara_task_handle);
-    xTaskCreate(esp_sara_event_task, "esp_sara_event_task", 4096 * 2, client, 5, client->esp_sara_event_task_handle);
+    xTaskCreate(esp_sara_event_task, "esp_sara_event_task", 4096 * 3, client, 5, client->esp_sara_event_task_handle);
+
+    switch (client->transport)
+    {
+    case SARA_TRANSPORT_TCP:
+        break;
+    case SARA_TRANSPORT_UDP:
+        break;
+    case SARA_TRANSPORT_MQTT:
+    {
+        xTaskCreate(esp_sara_mqtt_task, "esp_sara_mqtt_task", 4096, client, 5, client->esp_sara_transport_task_handle);
+    }
+    break;
+    default:
+        break;
+    }
     return ESP_OK;
 }
 
@@ -87,13 +103,61 @@ esp_err_t esp_sara_stop(esp_sara_client_handle_t *client)
 {
     vTaskDelete(client->esp_sara_task_handle);
     vTaskDelete(client->esp_sara_event_task_handle);
+    switch (client->transport)
+    {
+    case SARA_TRANSPORT_TCP:
+        break;
+    case SARA_TRANSPORT_UDP:
+        break;
+    case SARA_TRANSPORT_MQTT:
+    {
+        vTaskDelete(client->esp_sara_transport_task_handle);
+    }
+    break;
+    default:
+        break;
+    }
     free(client);
     return ESP_OK;
 }
 
-static void esp_sara_task(void *param)
+void esp_sara_mqtt_task(void *param)
 {
     esp_sara_client_handle_t *client = (esp_sara_client_handle_t *)param;
+    esp_sara_mqtt_client_config_t *config = ((esp_sara_mqtt_client_config_t *)client->transport_config);
+    int no_signal_counter = 0;
+    int interval_ping = (config->timeout * 1000) / portTICK_PERIOD_MS;
+    TickType_t xLastPing = xTaskGetTickCount();
+    while (1)
+    {
+        if (client->cgatt == 1)
+        {
+            ESP_LOGI(TAG, "login state %d", client->mqtt_state);
+            if (client->mqtt_state == SARA_MQTT_DISCONNECTED)
+            {
+                esp_sara_config_mqtt(client);
+                esp_sara_login_mqtt(client);
+                xLastPing = xTaskGetTickCount();
+            }
+            else
+            {
+                TickType_t now;
+                if ((now = xTaskGetTickCount()) - xLastPing > interval_ping)
+                {
+                    esp_sara_ping_mqtt_server(config->host);
+                    xLastPing = now;
+                }
+                esp_sara_mqtt_read_message();
+            }
+        }
+        vTaskDelay(10000 / portTICK_PERIOD_MS);
+    }
+}
+
+void esp_sara_task(void *param)
+{
+    esp_sara_client_handle_t *client = (esp_sara_client_handle_t *)param;
+
     esp_err_t err = ESP_ERR_TIMEOUT;
     while (err != ESP_OK)
     {
@@ -102,52 +166,20 @@ static void esp_sara_task(void *param)
             ESP_LOGE(TAG, "Modem timeout. Retry...");
         vTaskDelay(1000);
     }
-    esp_sara_disable_echo();
-    esp_sara_set_apn(client->config->apn);
-    esp_sara_set_rat(client->config->rat);
 
     int no_signal_counter = 0;
-    TickType_t xLastWakeup, xLastPing = xTaskGetTickCount();
+    bool reset = true;
     while (1)
     {
-        xLastWakeup = xTaskGetTickCount();
+        if (reset)
+        {
+            esp_sara_disable_echo();
+            esp_sara_set_apn(client->config->apn);
+            esp_sara_set_rat(client->config->rat);
+            reset = false;
+        }
         esp_sara_check_signal();
         esp_sara_is_connected();
-        switch (client->transport)
-        {
-        case SARA_TRANSPORT_TCP:
-            break;
-        case SARA_TRANSPORT_UDP:
-            break;
-        case SARA_TRANSPORT_MQTT:
-            if (client->cgatt == 1)
-            {
-                ESP_LOGI(TAG, "login state %d", client->mqtt_state);
-                if (client->mqtt_state == SARA_MQTT_DISCONNECTED)
-                {
-                    esp_sara_config_mqtt(client);
-                    /* esp_sara_login_mqtt(client);
-                    if(client->mqtt_state == SARA_MQTT_DISCONNECTED)
-                    {
-                        no_signal_counter++;
-                    }
-                    xLastPing = xTaskGetTickCount(); */
-                }
-                else
-                {
-                    TickType_t now;
-                    if((now = xTaskGetTickCount()) - xLastPing > 30000)
-                    {
-                        esp_sara_ping_mqtt_server(((esp_sara_mqtt_client_config_t *)client->transport_config)->host);
-                        xLastPing = now;
-                    }
-                    esp_sara_mqtt_read_message();
-                }
-            }
-            break;
-        default:
-            break;
-        }
         if (client->csq > 31)
             no_signal_counter++;
 
@@ -155,9 +187,10 @@ static void esp_sara_task(void *param)
         {
             no_signal_counter = 0;
             esp_sara_set_function(15);
+            reset = true;
             vTaskDelay(10000 / portTICK_PERIOD_MS);
         }
-        vTaskDelay(10000 / portTICK_PERIOD_MS);
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
     }
 }
 
@@ -172,135 +205,190 @@ static void esp_sara_event_task(void *param)
         char rc[SARA_BUFFER_SIZE];
         if (xQueueReceive(at_queue, &rc, 1000) == pdPASS)
         {
-            if (rc != NULL)
+            ESP_LOGI(TAG, "%s", rc);
+            char *ch = strtok(rc, " ");
+
+            if (ch == NULL)
+                continue;
+
+            bool should_callback = false;
+
+            event.payload_size = 0;
+            memset(event.payload, 0, 1024);
+
+            if (strstr(ch, "+CSQ:") != NULL)
             {
-                ESP_LOGI(TAG, "%s", rc);
-                char *ch = strtok(rc, ": ");
-                bool should_callback = false;
+                ch = strtok(NULL, ",");
+                int csq = atoi(ch);
 
-                if (ch != NULL)
+                event.event_id = csq < 32 ? SARA_EVENT_SIGNAL_FOUND : SARA_EVENT_SIGNAL_NOT_FOUND;
+
+                esp_sara_event_id_t prev_event_id = client->csq < 32 ? SARA_EVENT_SIGNAL_FOUND : SARA_EVENT_SIGNAL_NOT_FOUND;
+                should_callback = event.event_id != prev_event_id ? true : false;
+
+                event.payload_size = 1;
+                event.payload[0] = csq;
+                client->csq = csq;
+            }
+            else if (strstr(ch, "+CGATT:") != NULL)
+            {
+                ch = strtok(NULL, ": ");
+                int state = atoi(ch);
+
+                event.event_id = state == 1 ? SARA_EVENT_ATTACHED : SARA_EVENT_DETTACHED;
+                should_callback = state != client->cgatt ? true : false;
+
+                event.payload_size = 0;
+                client->cgatt = state;
+            }
+            else if (strstr(ch, "+UUMQTTC:") != NULL)
+            {
+                ch = strtok(NULL, ",");
+                int op = atoi(ch);
+                ch = strtok(NULL, ",");
+                int result = atoi(ch);
+                switch (op)
                 {
-                    if (strcmp(ch, "+CSQ") == 0)
+                case SARA_UMQTTC_OP_LOGIN:
+                {
+                    esp_sara_mqtt_state_t mqtt_state = result == 0 ? SARA_MQTT_CONNECTED : SARA_MQTT_DISCONNECTED;
+
+                    event.event_id = mqtt_state ? SARA_EVENT_MQTT_CONNECTED : SARA_EVENT_MQTT_DISCONNECTED;
+
+                    should_callback = mqtt_state != client->mqtt_state ? true : false;
+
+                    client->mqtt_state = mqtt_state;
+                    if (client->mqtt_state == SARA_MQTT_DISCONNECTED)
+                        esp_sara_get_mqtt_error();
+                }
+                break;
+                case SARA_UMQTTC_OP_LOGOUT:
+                {
+                    esp_sara_mqtt_state_t mqtt_state = result == 0 ? SARA_MQTT_DISCONNECTED : client->mqtt_state;
+
+                    should_callback = mqtt_state != client->mqtt_state ? true : false;
+
+                    event.event_id = mqtt_state ? SARA_EVENT_MQTT_DISCONNECTED : SARA_EVENT_MQTT_CONNECTED;
+
+                    client->mqtt_state = mqtt_state;
+                    if (!result)
+                        esp_sara_get_mqtt_error();
+                }
+                break;
+                case SARA_UMQTTC_OP_SUBSCRIBE:
+                {
+                    if (result)
                     {
                         ch = strtok(NULL, ",");
-                        int csq = atoi(ch);
-                        if (csq > 31 && client->csq < 32)
-                        {
-                            event.event_id = SARA_EVENT_SIGNAL_NOT_FOUND;
-                            should_callback = true;
-                        }
-                        else if (csq < 32 && client->csq > 31)
-                        {
-                            event.event_id = SARA_EVENT_SIGNAL_FOUND;
-                            should_callback = true;
-                        }
-                        event.payload_size = 1;
-                        event.payload[0] = csq;
-                        client->csq = csq;
+                        ch = strtok(NULL, ",");
+                        event.event_id = SARA_EVENT_MQTT_SUBSCRIBED;
+                        memset(event.topic, '\0', 64);
+                        strcpy((char *)&event.topic, ch);
                     }
-                    else if (strcmp(ch, "+CGATT") == 0)
+                    else
                     {
-                        ch = strtok(NULL, ": ");
-                        int state = atoi(ch);
-                        if (state == 1 && client->cgatt == 0)
-                        {
-                            event.event_id = SARA_EVENT_ATTACHED;
-                            should_callback = true;
-                        }
-                        else if (state == 0 && client->cgatt == 1)
-                        {
-                            event.event_id = SARA_EVENT_DETTACHED;
-
-                            client->mqtt_state = SARA_MQTT_DISCONNECTED;
-                            should_callback = true;
-                        }
-                        event.payload_size = 0;
-                        client->cgatt = state;
+                        event.event_id = SARA_EVENT_MQTT_SUBSCRIBE_FAILED;
+                        esp_sara_get_mqtt_error();
                     }
-                    else if (strstr(ch, "+UUMQTTC") != NULL)
+                    should_callback = true;
+                }
+                break;
+                default:
+                    break;
+                }
+            }
+            else if (strstr(ch, "+UMQTTC:") != NULL)
+            {
+                ch = strtok(NULL, ",");
+                if (ch == NULL)
+                    continue;
+                int op = atoi(ch);
+                ch = strtok(NULL, ",");
+                if (ch == NULL)
+                    continue;
+                int result = atoi(ch);
+                if (result == 0)
+                    esp_sara_get_mqtt_error();
+                switch (op)
+                {
+                case SARA_UMQTT_OP_PUBLISH:
+                {
+                    if (result)
                     {
-                        ch = strtok(NULL, ",");
-                        int op = atoi(ch);
-                        ch = strtok(NULL, ",");
-                        int result = atoi(ch);
-                        switch (op)
-                        {
-                        case SARA_UMQTTC_OP_LOGIN:
-                        {
-                            bool mqtt_state = result == 0;
-
-                            if (mqtt_state != client->mqtt_state)
-                            {
-                                event.event_id = SARA_EVENT_MQTT_CONNECTED;
-                                should_callback = true;
-                            }
-
-                            client->mqtt_state = mqtt_state;
-                            ESP_LOGI(TAG, "login state %d", client->mqtt_state);
-                        }
-                        break;
-                        case SARA_UMQTTC_OP_LOGOUT:
-                        {
-                            bool mqtt_state = result == 0;
-
-                            if (mqtt_state != client->mqtt_state)
-                            {
-                                event.event_id = SARA_EVENT_MQTT_CONNECTED;
-                                should_callback = true;
-                            }
-
-                            client->mqtt_state = mqtt_state;
-                            ESP_LOGI(TAG, "login state %d", client->mqtt_state);
-                        }
-                        case SARA_UMQTTC_OP_SUBSCRIBE:
-                        {
-                            if (result)
-                            {
-                                ch = strtok(NULL, ",");
-                                ch = strtok(NULL, ",");
-                                event.event_id = SARA_EVENT_MQTT_SUBSCRIBED;
-                                strcpy((char*)&event.payload, ch);
-                            }
-                            else
-                            {
-                                event.event_id = SARA_EVENT_MQTT_SUBSCRIBED;
-                            }
-                            should_callback = true;
-                        }
-                        break;
-                        break;
-                        }
+                        event.event_id = SARA_EVENT_PUBLISHED;
                     }
-                    else if (strstr(ch, "+UMQTTC"))
+                    else
                     {
-                        ch = strtok(NULL, ",");
-                        int op = atoi(ch);
-                        ch = strtok(NULL, ",");
-                        int result = atoi(ch);
-                        switch (op)
-                        {
-                        case SARA_UMQTT_OP_PUBLISH:
-                        {
-                            if(result)
-                            {
-                                event.event_id = SARA_EVENT_PUBLISHED;
-                            }
-                            else
-                            {
-                                event.event_id = SARA_EVENT_PUBLISH_FAILED;
-                            }
-                            should_callback = true;
-                        }
-                        break;
-                        default:
-                            break;
-                        }
+                        event.event_id = SARA_EVENT_PUBLISH_FAILED;
+                        esp_sara_get_mqtt_error();
+                    }
+                    should_callback = true;
+                }
+                break;
+                case SARA_UMQTTC_OP_SUBSCRIBE:
+                {
+                    if (result)
+                    {
+                        event.event_id = SARA_EVENT_MQTT_SUBSCRIBED;
+                    }
+                    else
+                    {
+                        event.event_id = SARA_EVENT_MQTT_SUBSCRIBE_FAILED;
+                        esp_sara_get_mqtt_error();
+                    }
+                    should_callback = true;
+                }
+                break;
+                default:
+                    break;
+                }
+            }
+            else if (strstr(ch, "+UUMQTTCM:") != NULL)
+            {
+                ch = strtok(NULL, ",");
+                if (ch == NULL)
+                    continue;
+                int op = atoi(ch);
+                switch (op)
+                {
+                case SARA_UMQTTC_OP_MESSAGE:
+                {
+                    ch = strtok(NULL, "\r\n");
+                    if (ch == NULL)
+                        continue;
+                    int num_messages = atoi(ch);
+                    ESP_LOGI(TAG, "%d messages", num_messages);
+                    for (int i = 0; i < num_messages; i++)
+                    {
+                        ch = strtok(NULL, "\r\n");
+                        if (ch == NULL)
+                            continue;
+                        ESP_LOGI(TAG, "topic %s", ch + 6);
+                        memset(event.topic, '\0', 64);
+                        strcpy((char *)event.topic, ch + 6);
+                        ch = strtok(NULL, "\r\n");
+                        if (ch == NULL)
+                            continue;
+                        ESP_LOGI(TAG, "msg %s", ch + 4);
+                        strcpy((char *)event.payload, ch + 4);
+                        event.payload_size = strlen((char *)event.payload);
+                        event.event_id = SARA_EVENT_MQTT_DATA;
+                        if (client->event_handle)
+                            client->event_handle(&event);
                     }
                 }
-
-                if (should_callback && client->event_handle)
-                    client->event_handle(&event);
+                break;
+                default:
+                    break;
+                }
             }
+            else if (strstr(ch, "+UMQTTER:") != NULL)
+            {
+                ESP_LOGE(TAG, "+UMQTTERR %s", strtok(NULL, "\r\n"));
+            }
+
+            if (should_callback && client->event_handle)
+                client->event_handle(&event);
         }
         vTaskDelay(10 / portTICK_PERIOD_MS);
     }
@@ -345,17 +433,18 @@ esp_err_t esp_sara_publish_mqtt(esp_sara_client_handle_t *client, const char *to
     int len = strlen(data);
     if (use_hex)
     {
-        char hex[len * 2];
-        int i = 0, j = 0;
-        for (i = 0; i < len * 2; i += 2)
+        char hex[2], hex_string[len * 2];
+        int i = 0;
+        for (i = 0; i < len; i++)
         {
-            sprintf(hex + i, "%.2X", data[j++]);
+            sprintf(hex, "%.2X", data[i]);
+            strcat(hex_string, hex);
         }
         len = sprintf(cmd, "AT+UMQTTC=2,%d,%d,%d,\"%s\",\"%s\"\r\n", qos, retain, use_hex, topic, hex);
     }
     else
     {
-        len = sprintf(cmd, "AT+UMQTTC=2,%d,%d,%d,\"%s\",\"%s\"\r\n", qos, retain, use_hex, topic, data);
+        len = sprintf(cmd, "AT+UMQTTC=2,%d,%d,\"%s\",\"%s\"\r\n", qos, retain, topic, data);
     }
-    return esp_sara_send_at_command(cmd, len, 1000);
+    return esp_sara_send_at_command(cmd, len, 60000);
 }
