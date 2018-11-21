@@ -16,7 +16,7 @@ volatile bool mqtt_connected = false;
 static esp_err_t sara_event_handle(esp_sara_event_handle_t *event)
 {
     const char *TAG = "EVENT";
-    esp_sara_client_handle_t * client = event->client;
+    esp_sara_client_handle_t *client = event->client;
     switch (event->event_id)
     {
     case SARA_EVENT_SIGNAL_FOUND:
@@ -77,34 +77,36 @@ void app_main()
 {
     ESP_LOGI("APP", "Starting...");
 
-    esp_sara_client_config_t config = {};
-    config.apn = "test.m2m.indosat.com";
-    config.rat = 8;
-    config.use_hex = false;
-    config.transport = SARA_TRANSPORT_MQTT;
-    config.event_handle = sara_event_handle;
-    
-    esp_sara_mqtt_client_config_t mqtt_config = {};
     char id[32];
     uint8_t mac[6];
     esp_read_mac(mac, ESP_MAC_WIFI_STA);
     sprintf(id, "dytrax.%.2x%.x2%.2x%.2x%.2x%.2x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-    mqtt_config.client_id = id;
-    mqtt_config.host = "66.42.48.129";
-    mqtt_config.port = 1883;
-    mqtt_config.timeout = 120;
-    mqtt_config.clean_session = false;
 
-    config.transport_config = (esp_sara_transport_config_t*)&mqtt_config;
+    esp_sara_mqtt_client_config_t mqtt_config = {
+        .client_id = id,
+        .host = "66.42.48.129",
+        .port = 1883,
+        .timeout = 120,
+        .clean_session = false,
+    };
+
+    esp_sara_client_config_t config = {
+        .apn = "test.m2m.indosat.com",
+        .rat = 8,
+        .use_hex = false,
+        .transport = SARA_TRANSPORT_MQTT,
+        .transport_config = (esp_sara_transport_config_t *)&mqtt_config,
+        .event_handle = sara_event_handle,
+    };
 
     esp_sara_client_handle_t *sara = esp_sara_client_init(&config);
     esp_sara_start(sara);
 
     int i = 0;
-    while(1)
+    while (1)
     {
         ESP_LOGI("APP", "esp_free_heap %u", esp_get_free_heap_size());
-        if(mqtt_connected)
+        if (mqtt_connected)
         {
             char msg[32];
             sprintf(msg, "test %d", i++);
