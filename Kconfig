@@ -1,4 +1,4 @@
-menu "SARA R4 COnfigurations"
+menu "ESP SARA NBIOT"
 
 config SARA_UART_NUM_SELECTION_ENABLED
 	bool "Enable UART port selection"
@@ -67,7 +67,7 @@ config SARA_UART_DTR_PIN
         Pin for UART DTR
 
 config SARA_UART_BAUD
-    int "Default UART TX Pin"
+    int "Default UART BAUD Rate"
     default 115200
     help
         UART Baud Rate

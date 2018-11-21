@@ -14,11 +14,12 @@ Clone this repository as component
 
 ### Options for esp_sara_client_config_t
 
-- ```apn```: internet apn
+- ```apn```: internet apn string
 - ```rat```: radio access technology
 - ```use_hex```: use hex in payload
-- ```event_handle```: for sara event
-- ```transport```: technology for communication
+- ```event_handle```: for sara events
+- ```transport```: transport protocol to use
+    - ```SARA_TRANSPORT_MQTT```: Transport over MQTT tcp
 - ```transport_config```: configuration for transport
 
 example configuration of esp_sara_client_config_t
@@ -35,7 +36,7 @@ esp_sara_client_config_t config = {
 
 ### Options for esp_sara_mqtt_client_config_t
 
-- ```host```: ip address of MQTT broker
+- ```host```: ip address string of MQTT broker
 - ```port```: port of MQTT broker
 - ```client_id```: id of MQTT client
 - ```timeout```: keep alive timeout
@@ -52,6 +53,12 @@ esp_sara_mqtt_client_config_t mqtt_config = {
 };
 
 config.transport_config = (esp_sara_transport_config_t*)&mqtt_config;
+```
+
+### Change setting in ```menuconfig```
+```
+make menuconfig
+Component config -> ESP SARA NBIOT
 ```
 
 ## Example
@@ -96,6 +103,7 @@ static esp_err_t sara_event_handle(esp_sara_event_handle_t *event)
         ESP_LOGI(TAG, "MQTT_CONNECTED");
         mqtt_connected = true;
         esp_sara_subscribe_mqtt(client, "/test/rx", 1);
+        esp_sara_publish_mqtt(sara, "/test/tx", "test, false, 1, 0);
     }
     case SARA_EVENT_MQTT_DATA:
     {
@@ -140,3 +148,5 @@ esp_sara_client_handle_t *sara = esp_sara_client_init(&config);
 esp_sara_start(sara);
 
 ```
+
+## License
