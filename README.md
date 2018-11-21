@@ -45,11 +45,11 @@ esp_sara_client_config_t config = {
 example configuration of esp_sara_mqtt_client_config_t
 ```
 esp_sara_mqtt_client_config_t mqtt_config = {
-    mqtt_config.client_id = "dytrax",
-    mqtt_config.host = "66.42.48.129",
-    mqtt_config.port = 1883,
-    mqtt_config.timeout = 120,
-    mqtt_config.clean_session = false,
+    .client_id = "dytrax",
+    .host = "66.42.48.129",
+    .port = 1883,
+    .timeout = 120,
+    .clean_session = false,
 };
 
 config.transport_config = (esp_sara_transport_config_t*)&mqtt_config;
@@ -128,20 +128,20 @@ static esp_err_t sara_event_handle(esp_sara_event_handle_t *event)
 }
 
 esp_sara_mqtt_client_config_t mqtt_config = {
-    mqtt_config.client_id = "dytrax",
-    mqtt_config.host = "66.42.48.129",
-    mqtt_config.port = 1883,
-    mqtt_config.timeout = 120,
-    mqtt_config.clean_session = false,
+    .client_id = "dytrax",
+    .host = "66.42.48.129",
+    .port = 1883,
+    .timeout = 120,
+    .clean_session = false,
 };
 
 esp_sara_client_config_t config = {
-    apn = "test.m2m.indosat.com",
-    rat = 8,
-    use_hex = false,
-    transport = SARA_TRANSPORT_MQTT,
-    event_handle = sara_event_handle,
-    transport_config = (esp_sara_transport_config_t*)&mqtt_config,
+    .apn = "test.m2m.indosat.com",
+    .rat = 8,
+    .use_hex = false,
+    .transport = SARA_TRANSPORT_MQTT,
+    .event_handle = sara_event_handle,
+    .transport_config = (esp_sara_transport_config_t*)&mqtt_config,
 };
 
 esp_sara_client_handle_t *sara = esp_sara_client_init(&config);
