@@ -1,4 +1,15 @@
 #include "esp_sara_nbiot.h"
+#include "freeRTOS/FreeRTOS.h"
+#include "driver/uart.h"
+#include "esp_log.h"
+#include "esp_sara_nbiot.h"
+#include "freeRTOS/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/semphr.h"
+#include "freertos/queue.h"
+#include "freertos/event_groups.h"
+
+#include "esp_err.h"
 
 volatile bool mqtt_connected = false;
 
@@ -62,7 +73,7 @@ static esp_err_t sara_event_handle(esp_sara_event_handle_t *event)
     return ESP_OK;
 }
 
-extern "C" void app_main()
+void app_main()
 {
     ESP_LOGI("APP", "Starting...");
 

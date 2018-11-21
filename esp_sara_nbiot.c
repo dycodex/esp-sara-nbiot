@@ -400,6 +400,8 @@ esp_err_t esp_sara_config_mqtt(esp_sara_client_handle_t *client)
     esp_sara_set_mqtt_client_id(config->client_id);
     esp_sara_set_mqtt_server(config->host, config->port);
     esp_sara_set_mqtt_timeout(config->timeout);
+    if(config->username && config->password)
+        esp_sara_set_mqtt_auth(config->username, config->password);
     return ESP_OK;
 }
 

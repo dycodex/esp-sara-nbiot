@@ -29,6 +29,8 @@ esp_err_t esp_sara_set_mqtt_server(const char *server, int port);
 esp_err_t esp_sara_set_mqtt_timeout(uint16_t timeout);
 esp_err_t esp_sara_set_clean_session(bool session);
 
+esp_err_t esp_sara_set_mqtt_auth(const char * username, const char * password);
+
 esp_err_t esp_sara_ping_mqtt_server(const char *server);
 esp_err_t esp_sara_mqtt_read_message();
 esp_err_t esp_sara_get_mqtt_error();

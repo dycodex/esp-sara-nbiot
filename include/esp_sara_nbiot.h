@@ -41,6 +41,8 @@ typedef struct {
     const char * client_id;
     uint16_t timeout;
     bool clean_session;
+    const char * username;
+    const char * password;
 } esp_sara_mqtt_client_config_t;
 
 typedef struct {

@@ -210,6 +210,13 @@ esp_err_t esp_sara_set_clean_session(bool session)
     return esp_sara_send_at_command(cmd, len, 1000);
 }
 
+esp_err_t esp_sara_set_mqtt_auth(const char * username, const char * password)
+{
+    char cmd[64];
+    int len = sprintf(cmd, "AT+UMQTT=4,\"%s\",\"%s\"\r\n", username, password);
+    return esp_sara_send_at_command(cmd, len, 1000);
+}
+
 esp_err_t esp_sara_ping_mqtt_server(const char *server)
 {
     char cmd[64];
