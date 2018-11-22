@@ -41,6 +41,8 @@ esp_sara_client_config_t config = {
 - ```client_id```: id of MQTT client
 - ```timeout```: keep alive timeout
 - ```clean_session```: should client sesssion when connect
+- ```username```: username for MQTT authentication
+- ```password```: password for MQTT authentication
 
 example configuration of esp_sara_mqtt_client_config_t
 ```
@@ -54,6 +56,18 @@ esp_sara_mqtt_client_config_t mqtt_config = {
 
 config.transport_config = (esp_sara_transport_config_t*)&mqtt_config;
 ```
+
+### esp_sara_event_handle_t
+
+- ```event_id```: id to identify which event is happen
+- ```client```: pointer to esp_sara_client_handle_t client
+- ```payload_size```: size of payload, contents of payload differ in each event and some may not have payload
+- ```payload```: array to hold data, content of payload is:
+    - ```SARA_EVENT_MQTT_SIGNAL_FOUND```: contain 1 unsigned char csq value
+    - ```SARA_EVENT_MQTT_DATA```: contain message of subscription topic
+    - ```SARA_EVENT_CME_ERROR```: contain message of CME ERROR
+    - ```SARA_EVENT_MQTT_ERR```: contain error code and suplementary error code of MQTT
+- ```topic```: topic when there is data from MQTT subscriptions
 
 ### Change setting in ```menuconfig```
 ```
