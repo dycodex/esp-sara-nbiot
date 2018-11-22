@@ -390,6 +390,7 @@ static void esp_sara_event_task(void *param)
                 if (ch == NULL)
                     continue;
                 int err = atoi(ch);
+
                 ch = strtok(NULL, ",");
                 if (ch == NULL)
                     continue;
@@ -399,6 +400,8 @@ static void esp_sara_event_task(void *param)
                 *(int*)(event.payload + 4) = supl_err;
 
                 event.payload_size = 2 * sizeof(int);
+
+                should_callback = err != 0;
 
                 ESP_LOGE(TAG, "MQTT error %d %d", *(int*)event.payload, *(int*)event.payload + 4);
             }
