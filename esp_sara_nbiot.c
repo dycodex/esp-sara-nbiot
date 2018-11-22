@@ -182,8 +182,10 @@ void esp_sara_task(void *param)
         esp_sara_is_connected();
         if (client->csq > 31)
             no_signal_counter++;
+        else
+            no_signal_counter = 0;
 
-        if (no_signal_counter > 6)
+        if (no_signal_counter > 12)
         {
             no_signal_counter = 0;
             esp_sara_set_function(15);
@@ -205,7 +207,7 @@ static void esp_sara_event_task(void *param)
         char rc[SARA_BUFFER_SIZE];
         if (xQueueReceive(at_queue, &rc, 1000) == pdPASS)
         {
-            ESP_LOGI(TAG, "%s", rc);
+            //ESP_LOGI(TAG, "%s", rc);
             char *ch = strtok(rc, " ");
 
             if (ch == NULL)
@@ -384,7 +386,32 @@ static void esp_sara_event_task(void *param)
             }
             else if (strstr(ch, "+UMQTTER:") != NULL)
             {
-                ESP_LOGE(TAG, "+UMQTTERR %s", strtok(NULL, "\r\n"));
+                ch = strtok(NULL, ",");
+                if (ch == NULL)
+                    continue;
+                int err = atoi(ch);
+                ch = strtok(NULL, ",");
+                if (ch == NULL)
+                    continue;
+                int supl_err = atoi(ch);
+
+                *(int*)event.payload = err;
+                *(int*)(event.payload + 4) = supl_err;
+
+                event.payload_size = 2 * sizeof(int);
+
+                ESP_LOGE(TAG, "MQTT error %d %d", *(int*)event.payload, *(int*)event.payload + 4);
+            }
+            else if(strstr(ch, "+CME ERROR:") != NULL)
+            {
+                ch = strtok(NULL, "\r\n");
+                ESP_LOGE(TAG, "%s", ch);
+                
+                event.event_id = SARA_EVENT_CME_ERROR;
+                strcpy((char*)event.payload, ch);
+                event.payload_size = strlen((char*)event.payload);
+                
+                should_callback = true;
             }
 
             if (should_callback && client->event_handle)
@@ -392,6 +419,12 @@ static void esp_sara_event_task(void *param)
         }
         vTaskDelay(10 / portTICK_PERIOD_MS);
     }
+}
+
+esp_err_t esp_sara_get_csq(esp_sara_client_handle_t * client, int * csq)
+{
+    *csq = client->csq;
+    return ESP_OK;
 }
 
 esp_err_t esp_sara_config_mqtt(esp_sara_client_handle_t *client)

@@ -44,6 +44,7 @@ static esp_err_t esp_sara_wait_irc(int timeout)
     bool done = false;
     char message[SARA_BUFFER_SIZE];
     memset(message, '\0', SARA_BUFFER_SIZE);
+    TickType_t now, start = xTaskGetTickCount();
     while (!done)
     {
         uint8_t data[64] = {'\0'};
@@ -52,17 +53,22 @@ static esp_err_t esp_sara_wait_irc(int timeout)
         {
             uart_read_bytes(SARA_UART_NUM, (uint8_t *)data, length, timeout / portTICK_PERIOD_MS);
             strcat(message, (const char *)data);
-            if (strstr(message, "OK") != NULL)
+            if (strstr(message, "OK\r\n") != NULL)
             {
                 err = ESP_OK;
                 done = true;
             }
-            else if (strstr(message, "ERROR") != NULL)
+            else if (strstr(message, "ERROR\r\n") != NULL)
             {
                 err = ESP_FAIL;
                 done = true;
             }
         }
+        
+        if((now = xTaskGetTickCount()) - start > (timeout /portTICK_PERIOD_MS)) {
+            err = ESP_ERR_TIMEOUT;
+            break;
+        };
         vTaskDelay(10 / portTICK_PERIOD_MS);
     }
     xSemaphoreGive(uart_semaphore);
