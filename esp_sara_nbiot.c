@@ -125,7 +125,7 @@ void esp_sara_mqtt_task(void *param)
 {
     esp_sara_client_handle_t *client = (esp_sara_client_handle_t *)param;
     esp_sara_mqtt_client_config_t *config = ((esp_sara_mqtt_client_config_t *)client->transport_config);
-    int no_signal_counter = 0;
+    
     int interval_ping = (config->timeout * 1000) / portTICK_PERIOD_MS;
     TickType_t xLastPing = xTaskGetTickCount();
     while (1)

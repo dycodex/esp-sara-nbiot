@@ -53,19 +53,20 @@ static esp_err_t esp_sara_wait_irc(int timeout)
         {
             uart_read_bytes(SARA_UART_NUM, (uint8_t *)data, length, timeout / portTICK_PERIOD_MS);
             strcat(message, (const char *)data);
-            if (strstr(message, "OK\r\n") != NULL)
+            if (strstr(message, "OK") != NULL)
             {
                 err = ESP_OK;
                 done = true;
             }
-            else if (strstr(message, "ERROR\r\n") != NULL)
+            else if (strstr(message, "ERROR") != NULL)
             {
                 err = ESP_FAIL;
                 done = true;
             }
         }
-        
-        if((now = xTaskGetTickCount()) - start > (timeout /portTICK_PERIOD_MS)) {
+
+        if ((now = xTaskGetTickCount()) - start > (timeout / portTICK_PERIOD_MS))
+        {
             err = ESP_ERR_TIMEOUT;
             break;
         };
@@ -75,28 +76,26 @@ static esp_err_t esp_sara_wait_irc(int timeout)
 
     message[strlen(message)] = '\0';
     ESP_LOGI(TAG, "%s", message);
-    if (err == ESP_OK)
+
+    char *ch = strtok(message, "OK");
+    while (ch != NULL)
     {
-        char *ch = strtok(message, "OK");
-
-        while (ch != NULL)
+        char rc[SARA_BUFFER_SIZE];
+        strcpy(rc, ch);
+        int len = strlen(rc);
+        if (len > 2)
         {
-            char rc[SARA_BUFFER_SIZE];
-            strcpy(rc, ch);
-            int len = strlen(rc);
-            if (len > 2)
+            rc[len] = '\0';
+            if (xQueueSendToBack(at_queue, (void *)&rc, 1000 / portTICK_PERIOD_MS) == pdFAIL)
             {
-                rc[len] = '\0';
-                if (xQueueSendToBack(at_queue, (void *)&rc, 1000 / portTICK_PERIOD_MS) == pdFAIL)
-                {
-                    ESP_LOGE(TAG, "Send to queue failed");
-                }
+                ESP_LOGE(TAG, "Send to queue failed");
             }
-
-            ch = strtok(NULL, "OK");
         }
+
+        ch = strtok(NULL, "OK");
     }
-    else
+
+    if (err != ESP_OK)
     {
         ESP_LOGE(TAG, "AT Command Error");
     }
@@ -222,7 +221,7 @@ esp_err_t esp_sara_set_clean_session(bool session)
     return esp_sara_send_at_command(cmd, len, 1000);
 }
 
-esp_err_t esp_sara_set_mqtt_auth(const char * username, const char * password)
+esp_err_t esp_sara_set_mqtt_auth(const char *username, const char *password)
 {
     char cmd[64];
     int len = sprintf(cmd, "AT+UMQTT=4,\"%s\",\"%s\"\r\n", username, password);
