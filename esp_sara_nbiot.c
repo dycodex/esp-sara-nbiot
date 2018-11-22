@@ -167,6 +167,8 @@ void esp_sara_task(void *param)
         vTaskDelay(1000);
     }
 
+    esp_sara_check_sim();
+
     int no_signal_counter = 0;
     bool reset = true;
     while (1)

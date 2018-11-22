@@ -161,6 +161,12 @@ esp_err_t esp_sara_check_modem()
     return esp_sara_send_at_command(cmd, strlen(cmd), 1000);
 }
 
+esp_err_t esp_sara_check_sim()
+{
+    const char *cmd = "AT+CPIN?\r\n";
+    return esp_sara_send_at_command(cmd, strlen(cmd), 1000);
+}
+
 esp_err_t esp_sara_is_connected()
 {
     const char *cmd = "AT+CGATT?\r\n";

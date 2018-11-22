@@ -23,6 +23,7 @@ esp_err_t esp_sara_set_rat(int rat);
 esp_err_t esp_sara_set_function(int fun);
 esp_err_t esp_sara_check_signal();
 esp_err_t esp_sara_check_modem();
+esp_err_t esp_sara_check_sim();
 
 esp_err_t esp_sara_set_mqtt_client_id(const char *client_id);
 esp_err_t esp_sara_set_mqtt_server(const char *server, int port);
