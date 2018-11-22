@@ -8,7 +8,7 @@
 
 Clone this repository as component
 
-```git submodule add https://gitlab.com/DyCode/DycodeX/esp-sara-nbiot.git components/esp_sara_nbiot```
+```git submodule add https://github.com/dycodex/esp-sara-nbiot components/esp_sara_nbiot```
 
 ## Documentation
 
