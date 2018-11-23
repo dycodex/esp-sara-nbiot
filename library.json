@@ -1,0 +1,17 @@
+{
+    "name": "esp-sara-nbiot",
+    "version": "0.1.0",
+    "platforms": "espressif32",
+    "keywords": "esp32,nb-iot",
+    "description": "",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/dycodex/esp-sara-nbiot"
+    },
+    "build": {
+        "flags": [
+            "-I include"
+        ]
+    }
+
+}
