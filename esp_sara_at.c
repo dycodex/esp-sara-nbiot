@@ -8,26 +8,43 @@ static const char *TAG = "SARA_AT";
 static void esp_sara_read_at_response(void *param)
 {
     const char *TAG = "SARA_RX";
+
+    vTaskDelay(1000);
+    TickType_t start = xTaskGetTickCount();
     while (1)
     {
-        if (xSemaphoreTake(uart_semaphore, 5000 / portTICK_PERIOD_MS) == pdTRUE)
+        if (xSemaphoreTake(uart_semaphore, 1000) == pdTRUE)
         {
-            int length = 0;
-            ESP_ERROR_CHECK(uart_get_buffered_data_len(SARA_UART_NUM, (size_t *)&length));
-            if (length > 0)
+            int len = 0;
+            char message[SARA_BUFFER_SIZE];
+            memset(message, 0, SARA_BUFFER_SIZE);
+            while (1)
             {
-                char data[length + 1];
-                data[length] = '\0';
-                int len = uart_read_bytes(SARA_UART_NUM, (uint8_t *)data, length, 5000);
-
-                if (len > 2)
+                int length = 0;
+                ESP_ERROR_CHECK(uart_get_buffered_data_len(SARA_UART_NUM, (size_t *)&length));
+                if (length > 0)
                 {
-                    ESP_LOGI(TAG, "%d %s", len, data);
+                    char data[length + 1];
+                    data[length] = '\0';
+                    uart_read_bytes(SARA_UART_NUM, (uint8_t *)data, length, 30000);
+                    strcat(message, data);
 
-                    if (xQueueSendToBack(at_queue, (void *)&data, 1000) == pdFAIL)
-                    {
-                        ESP_LOGE(TAG, "Send to queue failed");
-                    }
+                    len = strlen(message);
+                    if(message[len - 1] == '\n') break;
+                }
+
+                vTaskDelay(10 / portTICK_PERIOD_MS);
+                TickType_t now;
+                if((now = xTaskGetTickCount()) - start > (10000 / portTICK_PERIOD_MS)) break;
+            }
+            
+            if (len > 2)
+            {
+                ESP_LOGI(TAG, "%d %s", len, message);
+
+                if (xQueueSendToBack(at_queue, (void *)&message, 1000) == pdFAIL)
+                {
+                    ESP_LOGE(TAG, "Send to queue failed");
                 }
             }
             xSemaphoreGive(uart_semaphore);
@@ -41,27 +58,27 @@ static esp_err_t esp_sara_wait_irc(int timeout)
     const char *TAG = "SARA_IRC";
     esp_err_t err = ESP_ERR_TIMEOUT;
     int length = 0;
-    bool done = false;
+    
     char message[SARA_BUFFER_SIZE];
     memset(message, '\0', SARA_BUFFER_SIZE);
     TickType_t now, start = xTaskGetTickCount();
-    while (!done)
-    {
-        uint8_t data[64] = {'\0'};
+    while (1)
+    { 
         uart_get_buffered_data_len(SARA_UART_NUM, (size_t *)&length);
         if (length > 0)
         {
+            uint8_t data[64] = {'\0'};
             uart_read_bytes(SARA_UART_NUM, (uint8_t *)data, length, timeout / portTICK_PERIOD_MS);
             strcat(message, (const char *)data);
             if (strstr(message, "OK") != NULL)
             {
                 err = ESP_OK;
-                done = true;
+                break;
             }
             else if (strstr(message, "ERROR") != NULL)
             {
                 err = ESP_FAIL;
-                done = true;
+                break;
             }
         }
 

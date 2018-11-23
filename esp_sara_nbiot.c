@@ -5,6 +5,8 @@
 #include "freeRTOS/FreeRTOS.h"
 #include "string.h"
 
+#define ESP_RESP_NULL_CHECK(x, action) if(x == NULL) { action; continue; }
+
 static const char *TAG = "SARA_CLIENT";
 
 typedef struct
@@ -31,9 +33,10 @@ typedef enum
 {
     SARA_UMQTTC_OP_LOGOUT = 0,
     SARA_UMQTTC_OP_LOGIN = 1,
-    SARA_UMQTT_OP_PUBLISH = 2,
+    SARA_UMQTTC_OP_PUBLISH = 2,
     SARA_UMQTTC_OP_SUBSCRIBE = 4,
     SARA_UMQTTC_OP_MESSAGE = 6,
+    SARA_UMQTTC_OP_PING = 8
 } esp_sara_umqttc_op_t;
 
 struct esp_sara_client
@@ -147,7 +150,6 @@ void esp_sara_mqtt_task(void *param)
                     esp_sara_ping_mqtt_server(config->host);
                     xLastPing = now;
                 }
-                esp_sara_mqtt_read_message();
             }
         }
         vTaskDelay(10000 / portTICK_PERIOD_MS);
@@ -212,8 +214,7 @@ static void esp_sara_event_task(void *param)
             //ESP_LOGI(TAG, "%s", rc);
             char *ch = strtok(rc, " ");
 
-            if (ch == NULL)
-                continue;
+            ESP_RESP_NULL_CHECK(ch, continue);
 
             bool should_callback = false;
 
@@ -237,6 +238,8 @@ static void esp_sara_event_task(void *param)
             else if (strstr(ch, "+CGATT:") != NULL)
             {
                 ch = strtok(NULL, ": ");
+                ESP_RESP_NULL_CHECK(ch, continue);
+
                 int state = atoi(ch);
 
                 event.event_id = state == 1 ? SARA_EVENT_ATTACHED : SARA_EVENT_DETTACHED;
@@ -248,8 +251,12 @@ static void esp_sara_event_task(void *param)
             else if (strstr(ch, "+UUMQTTC:") != NULL)
             {
                 ch = strtok(NULL, ",");
+                ESP_RESP_NULL_CHECK(ch, continue);
+                
                 int op = atoi(ch);
                 ch = strtok(NULL, ",");
+                ESP_RESP_NULL_CHECK(ch, continue);
+
                 int result = atoi(ch);
                 switch (op)
                 {
@@ -284,7 +291,10 @@ static void esp_sara_event_task(void *param)
                     if (result)
                     {
                         ch = strtok(NULL, ",");
+                        ESP_RESP_NULL_CHECK(ch, continue);
                         ch = strtok(NULL, ",");
+                        ESP_RESP_NULL_CHECK(ch, continue);
+
                         event.event_id = SARA_EVENT_MQTT_SUBSCRIBED;
                         memset(event.topic, '\0', 64);
                         strcpy((char *)&event.topic, ch);
@@ -304,18 +314,21 @@ static void esp_sara_event_task(void *param)
             else if (strstr(ch, "+UMQTTC:") != NULL)
             {
                 ch = strtok(NULL, ",");
-                if (ch == NULL)
-                    continue;
+                ESP_RESP_NULL_CHECK(ch, continue);
+
                 int op = atoi(ch);
+
                 ch = strtok(NULL, ",");
-                if (ch == NULL)
-                    continue;
+                ESP_RESP_NULL_CHECK(ch, continue);
+
                 int result = atoi(ch);
+
                 if (result == 0)
                     esp_sara_get_mqtt_error();
+
                 switch (op)
                 {
-                case SARA_UMQTT_OP_PUBLISH:
+                case SARA_UMQTTC_OP_PUBLISH:
                 {
                     if (result)
                     {
@@ -343,6 +356,15 @@ static void esp_sara_event_task(void *param)
                     should_callback = true;
                 }
                 break;
+                case SARA_UMQTTC_OP_PING:
+                {
+                    if(result == 0)
+                    {
+                        esp_sara_logout_mqtt(client);
+                        esp_sara_login_mqtt(client);
+                    }
+                }
+                break;
                 default:
                     break;
                 }
@@ -350,35 +372,41 @@ static void esp_sara_event_task(void *param)
             else if (strstr(ch, "+UUMQTTCM:") != NULL)
             {
                 ch = strtok(NULL, ",");
-                if (ch == NULL)
-                    continue;
+                ESP_RESP_NULL_CHECK(ch, continue);
+
                 int op = atoi(ch);
                 switch (op)
                 {
                 case SARA_UMQTTC_OP_MESSAGE:
                 {
                     ch = strtok(NULL, "\r\n");
-                    if (ch == NULL)
-                        continue;
+                    ESP_RESP_NULL_CHECK(ch, continue);
+
                     int num_messages = atoi(ch);
+                    
                     ESP_LOGI(TAG, "%d messages", num_messages);
                     for (int i = 0; i < num_messages; i++)
                     {
                         ch = strtok(NULL, "\r\n");
-                        if (ch == NULL)
-                            continue;
+                        ESP_RESP_NULL_CHECK(ch, esp_sara_mqtt_read_message());
+                        
                         ESP_LOGI(TAG, "topic %s", ch + 6);
                         memset(event.topic, '\0', 64);
                         strcpy((char *)event.topic, ch + 6);
+                        
                         ch = strtok(NULL, "\r\n");
-                        if (ch == NULL)
-                            continue;
+                        ESP_RESP_NULL_CHECK(ch, continue);
+                        
                         ESP_LOGI(TAG, "msg %s", ch + 4);
+
                         strcpy((char *)event.payload, ch + 4);
                         event.payload_size = strlen((char *)event.payload);
                         event.event_id = SARA_EVENT_MQTT_DATA;
+                        
                         if (client->event_handle)
+                        {
                             client->event_handle(&event);
+                        }
                     }
                 }
                 break;
@@ -389,13 +417,13 @@ static void esp_sara_event_task(void *param)
             else if (strstr(ch, "+UMQTTER:") != NULL)
             {
                 ch = strtok(NULL, ",");
-                if (ch == NULL)
-                    continue;
+                ESP_RESP_NULL_CHECK(ch, continue);
+
                 int err = atoi(ch);
 
                 ch = strtok(NULL, ",");
-                if (ch == NULL)
-                    continue;
+                ESP_RESP_NULL_CHECK(ch, continue);
+
                 int supl_err = atoi(ch);
 
                 *(int*)event.payload = err;
@@ -404,12 +432,12 @@ static void esp_sara_event_task(void *param)
                 event.payload_size = 2 * sizeof(int);
 
                 should_callback = err != 0;
-
-                ESP_LOGE(TAG, "MQTT error %d %d", *(int*)event.payload, *(int*)event.payload + 4);
             }
             else if(strstr(ch, "+CME ERROR:") != NULL)
             {
                 ch = strtok(NULL, "\r\n");
+                ESP_RESP_NULL_CHECK(ch, continue);
+
                 ESP_LOGE(TAG, "%s", ch);
                 
                 event.event_id = SARA_EVENT_CME_ERROR;
@@ -422,6 +450,7 @@ static void esp_sara_event_task(void *param)
             if (should_callback && client->event_handle)
                 client->event_handle(&event);
         }
+        
         vTaskDelay(10 / portTICK_PERIOD_MS);
     }
 }
@@ -445,7 +474,7 @@ esp_err_t esp_sara_config_mqtt(esp_sara_client_handle_t *client)
 
 esp_err_t esp_sara_login_mqtt(esp_sara_client_handle_t *client)
 {
-    return esp_sara_send_at_command("AT+UMQTTC=1\r\n", 14, 30000);
+    return esp_sara_send_at_command("AT+UMQTTC=1\r\n", 14, 120000);
 }
 
 esp_err_t esp_sara_logout_mqtt(esp_sara_client_handle_t *client)
