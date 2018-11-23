@@ -26,7 +26,7 @@ example configuration of esp_sara_client_config_t
 
 ```
 esp_sara_client_config_t config = {
-    .apn = "test.m2m.indosat.com",
+    .apn = "internet",
     .rat = 8,
     .use_hex = false,
     .transport = SARA_TRANSPORT_MQTT,

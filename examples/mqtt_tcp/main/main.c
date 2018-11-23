@@ -83,7 +83,7 @@ void app_main()
     ESP_LOGI("APP", "Starting...");
 
     esp_sara_client_config_t config = {};
-    config.apn = "test.m2m.indosat.com";
+    config.apn = "internet";
     config.rat = 8;
     config.use_hex = false;
     config.transport = SARA_TRANSPORT_MQTT;
