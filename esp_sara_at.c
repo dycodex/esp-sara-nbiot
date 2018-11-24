@@ -16,8 +16,7 @@ static void esp_sara_read_at_response(void *param)
         if (xSemaphoreTake(uart_semaphore, 1000) == pdTRUE)
         {
             int len = 0;
-            char message[SARA_BUFFER_SIZE];
-            memset(message, 0, SARA_BUFFER_SIZE);
+            char message[SARA_BUFFER_SIZE] = {0};
             while (1)
             {
                 int length = 0;
@@ -25,19 +24,27 @@ static void esp_sara_read_at_response(void *param)
                 if (length > 0)
                 {
                     char data[length + 1];
-                    data[length] = '\0';
-                    uart_read_bytes(SARA_UART_NUM, (uint8_t *)data, length, 30000);
+                    memset(data, 0, length + 2);
+                    uart_read_bytes(SARA_UART_NUM, (uint8_t *)data, length, 10);
                     strcat(message, data);
 
                     len = strlen(message);
-                    if(message[len - 1] == '\n') break;
+                    if ((message[len - 1] == '\n'))
+                    {
+                        break;
+                    }
                 }
 
-                vTaskDelay(10 / portTICK_PERIOD_MS);
                 TickType_t now;
-                if((now = xTaskGetTickCount()) - start > (10000 / portTICK_PERIOD_MS)) break;
+                vTaskDelay(10 / portTICK_PERIOD_MS);
+                if ((now = xTaskGetTickCount()) - start > (1000 / portTICK_PERIOD_MS))
+                {
+                    start = now;
+                    break;
+                }
             }
-            
+            xSemaphoreGive(uart_semaphore);
+
             if (len > 2)
             {
                 ESP_LOGI(TAG, "%d %s", len, message);
@@ -47,7 +54,6 @@ static void esp_sara_read_at_response(void *param)
                     ESP_LOGE(TAG, "Send to queue failed");
                 }
             }
-            xSemaphoreGive(uart_semaphore);
         }
         vTaskDelay(1 / portTICK_PERIOD_MS);
     }
@@ -58,27 +64,32 @@ static esp_err_t esp_sara_wait_irc(int timeout)
     const char *TAG = "SARA_IRC";
     esp_err_t err = ESP_ERR_TIMEOUT;
     int length = 0;
-    
+
     char message[SARA_BUFFER_SIZE];
     memset(message, '\0', SARA_BUFFER_SIZE);
     TickType_t now, start = xTaskGetTickCount();
     while (1)
-    { 
+    {
         uart_get_buffered_data_len(SARA_UART_NUM, (size_t *)&length);
         if (length > 0)
         {
             uint8_t data[64] = {'\0'};
             uart_read_bytes(SARA_UART_NUM, (uint8_t *)data, length, timeout / portTICK_PERIOD_MS);
             strcat(message, (const char *)data);
-            if (strstr(message, "OK") != NULL)
+            ESP_LOGI(TAG, "%s", data);
+
+            if (message[strlen(message) - 1] == '\n')
             {
-                err = ESP_OK;
-                break;
-            }
-            else if (strstr(message, "ERROR") != NULL)
-            {
-                err = ESP_FAIL;
-                break;
+                if (strstr(message, "OK") != NULL)
+                {
+                    err = ESP_OK;
+                    break;
+                }
+                else if (strstr(message, "ERROR") != NULL)
+                {
+                    err = ESP_FAIL;
+                    break;
+                }
             }
         }
 
@@ -92,7 +103,6 @@ static esp_err_t esp_sara_wait_irc(int timeout)
     xSemaphoreGive(uart_semaphore);
 
     message[strlen(message)] = '\0';
-    ESP_LOGI(TAG, "%s", message);
 
     char *ch = strtok(message, "OK");
     while (ch != NULL)
@@ -147,7 +157,7 @@ void esp_sara_uart_init()
     ESP_ERROR_CHECK(uart_set_pin(SARA_UART_NUM, SARA_UART_TX_PIN, SARA_UART_RX_PIN, SARA_UART_RTS_PIN, SARA_UART_DTR_PIN));
     ESP_ERROR_CHECK(uart_driver_install(SARA_UART_NUM, SARA_BUFFER_SIZE * 2, SARA_BUFFER_SIZE, SARA_BUFFER_SIZE, NULL, 0));
 
-    at_queue = xQueueCreate(5, SARA_BUFFER_SIZE);
+    at_queue = xQueueCreate(10, SARA_BUFFER_SIZE);
     uart_semaphore = xSemaphoreCreateMutex();
     xTaskCreate(esp_sara_read_at_response, "sara_rx_task", 4096, NULL, 4, &uart_task_handle);
     ESP_LOGI(TAG, "esp_sara_uart_client_handle_t init");

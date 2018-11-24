@@ -5,7 +5,12 @@
 #include "freeRTOS/FreeRTOS.h"
 #include "string.h"
 
-#define ESP_RESP_NULL_CHECK(x, action) if(x == NULL) { action; continue; }
+#define ESP_RESP_NULL_CHECK(x, action) \
+    if (x == NULL)                     \
+    {                                  \
+        action;                        \
+        continue;                      \
+    }
 
 static const char *TAG = "SARA_CLIENT";
 
@@ -128,7 +133,7 @@ void esp_sara_mqtt_task(void *param)
 {
     esp_sara_client_handle_t *client = (esp_sara_client_handle_t *)param;
     esp_sara_mqtt_client_config_t *config = ((esp_sara_mqtt_client_config_t *)client->transport_config);
-    
+
     int interval_ping = (config->timeout * 1000) / portTICK_PERIOD_MS;
     TickType_t xLastPing = xTaskGetTickCount();
     while (1)
@@ -166,10 +171,14 @@ void esp_sara_task(void *param)
         err = esp_sara_check_modem();
         if (err == ESP_ERR_TIMEOUT)
             ESP_LOGE(TAG, "Modem timeout. Retry...");
-        vTaskDelay(1000);
     }
 
-    esp_sara_check_sim();
+    while (err != ESP_OK)
+    {
+        err = esp_sara_check_sim();
+        if (err == ESP_ERR_TIMEOUT)
+            ESP_LOGE(TAG, "Modem timeout. Retry...");
+    }
 
     int no_signal_counter = 0;
     bool reset = true;
@@ -177,9 +186,21 @@ void esp_sara_task(void *param)
     {
         if (reset)
         {
-            esp_sara_disable_echo();
-            esp_sara_set_apn(client->config->apn);
-            esp_sara_set_rat(client->config->rat);
+            do
+            {
+                err = esp_sara_disable_echo();
+            } while (err != ESP_OK);
+
+            do
+            {
+                err = esp_sara_set_apn(client->config->apn);
+            } while (err != ESP_OK);
+
+            do
+            {
+                err = esp_sara_set_rat(client->config->rat);
+            } while (err != ESP_OK);
+
             reset = false;
         }
         esp_sara_check_signal();
@@ -192,8 +213,8 @@ void esp_sara_task(void *param)
         if (no_signal_counter > 12)
         {
             no_signal_counter = 0;
-            esp_sara_set_function(15);
-            reset = true;
+            //esp_sara_set_function(15);
+            //reset = true;
             vTaskDelay(10000 / portTICK_PERIOD_MS);
         }
         vTaskDelay(5000 / portTICK_PERIOD_MS);
@@ -211,7 +232,7 @@ static void esp_sara_event_task(void *param)
         char rc[SARA_BUFFER_SIZE];
         if (xQueueReceive(at_queue, &rc, 1000) == pdPASS)
         {
-            //ESP_LOGI(TAG, "%s", rc);
+            ESP_LOGI(TAG, "%s", rc);
             char *ch = strtok(rc, " ");
 
             ESP_RESP_NULL_CHECK(ch, continue);
@@ -252,7 +273,7 @@ static void esp_sara_event_task(void *param)
             {
                 ch = strtok(NULL, ",");
                 ESP_RESP_NULL_CHECK(ch, continue);
-                
+
                 int op = atoi(ch);
                 ch = strtok(NULL, ",");
                 ESP_RESP_NULL_CHECK(ch, continue);
@@ -325,7 +346,7 @@ static void esp_sara_event_task(void *param)
 
                 if (result == 0)
                     esp_sara_get_mqtt_error();
-
+        
                 switch (op)
                 {
                 case SARA_UMQTTC_OP_PUBLISH:
@@ -358,7 +379,7 @@ static void esp_sara_event_task(void *param)
                 break;
                 case SARA_UMQTTC_OP_PING:
                 {
-                    if(result == 0)
+                    if (result == 0)
                     {
                         esp_sara_logout_mqtt(client);
                         esp_sara_login_mqtt(client);
@@ -383,26 +404,26 @@ static void esp_sara_event_task(void *param)
                     ESP_RESP_NULL_CHECK(ch, continue);
 
                     int num_messages = atoi(ch);
-                    
+
                     ESP_LOGI(TAG, "%d messages", num_messages);
                     for (int i = 0; i < num_messages; i++)
                     {
                         ch = strtok(NULL, "\r\n");
                         ESP_RESP_NULL_CHECK(ch, esp_sara_mqtt_read_message());
-                        
+
                         ESP_LOGI(TAG, "topic %s", ch + 6);
                         memset(event.topic, '\0', 64);
                         strcpy((char *)event.topic, ch + 6);
-                        
+
                         ch = strtok(NULL, "\r\n");
                         ESP_RESP_NULL_CHECK(ch, continue);
-                        
+
                         ESP_LOGI(TAG, "msg %s", ch + 4);
 
                         strcpy((char *)event.payload, ch + 4);
                         event.payload_size = strlen((char *)event.payload);
                         event.event_id = SARA_EVENT_MQTT_DATA;
-                        
+
                         if (client->event_handle)
                         {
                             client->event_handle(&event);
@@ -426,36 +447,36 @@ static void esp_sara_event_task(void *param)
 
                 int supl_err = atoi(ch);
 
-                *(int*)event.payload = err;
-                *(int*)(event.payload + 4) = supl_err;
+                *(int *)event.payload = err;
+                *(int *)(event.payload + 4) = supl_err;
 
                 event.payload_size = 2 * sizeof(int);
 
                 should_callback = err != 0;
             }
-            else if(strstr(ch, "+CME ERROR:") != NULL)
+            else if (strstr(ch, "+CME ERROR:") != NULL)
             {
                 ch = strtok(NULL, "\r\n");
                 ESP_RESP_NULL_CHECK(ch, continue);
 
                 ESP_LOGE(TAG, "%s", ch);
-                
+
                 event.event_id = SARA_EVENT_CME_ERROR;
-                strcpy((char*)event.payload, ch);
-                event.payload_size = strlen((char*)event.payload);
-                
+                strcpy((char *)event.payload, ch);
+                event.payload_size = strlen((char *)event.payload);
+
                 should_callback = true;
             }
 
             if (should_callback && client->event_handle)
                 client->event_handle(&event);
         }
-        
+
         vTaskDelay(10 / portTICK_PERIOD_MS);
     }
 }
 
-esp_err_t esp_sara_get_csq(esp_sara_client_handle_t * client, int * csq)
+esp_err_t esp_sara_get_csq(esp_sara_client_handle_t *client, int *csq)
 {
     *csq = client->csq;
     return ESP_OK;
@@ -464,11 +485,30 @@ esp_err_t esp_sara_get_csq(esp_sara_client_handle_t * client, int * csq)
 esp_err_t esp_sara_config_mqtt(esp_sara_client_handle_t *client)
 {
     esp_sara_mqtt_client_config_t *config = (esp_sara_mqtt_client_config_t *)client->transport_config;
-    esp_sara_set_mqtt_client_id(config->client_id);
-    esp_sara_set_mqtt_server(config->host, config->port);
-    esp_sara_set_mqtt_timeout(config->timeout);
-    if(config->username && config->password)
-        esp_sara_set_mqtt_auth(config->username, config->password);
+    esp_err_t err = ESP_ERR_TIMEOUT;
+    do
+    {
+        err = esp_sara_set_mqtt_client_id(config->client_id);
+    } while (err != ESP_OK);
+
+    do
+    {
+        err = esp_sara_set_mqtt_server(config->host, config->port);
+    } while (err != ESP_OK);
+
+    do
+    {
+        err = esp_sara_set_mqtt_timeout(config->timeout);
+    } while (err != ESP_OK);
+
+    if (config->username && config->password)
+    {
+        do
+        {
+            err = esp_sara_set_mqtt_auth(config->username, config->password);
+        } while (err != ESP_OK);
+    }
+
     return ESP_OK;
 }
 
