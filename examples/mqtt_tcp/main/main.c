@@ -46,8 +46,9 @@ static esp_err_t sara_event_handle(esp_sara_event_handle_t *event)
     {
         ESP_LOGI(TAG, "MQTT_CONNECTED");
         mqtt_connected = true;
-        esp_sara_subscribe_mqtt(client, "/test/rx", 1);
+        esp_sara_subscribe_mqtt(client, "generic_brand_617/generic_device/v1nm/common", 1);
     }
+    break;
     case SARA_EVENT_MQTT_DATA:
     {
         ESP_LOGI(TAG, "MQTT_DATA");
@@ -68,9 +69,10 @@ static esp_err_t sara_event_handle(esp_sara_event_handle_t *event)
     {
         ESP_LOGE(TAG, "MQTT ERROR %d %d", *(int*) event->payload, *(int*)(event->payload + 4));
     }
+    break;
     case SARA_EVENT_CME_ERROR:
     {
-        ESP_LOGE(TAG, "CME ERROR %s", (char)event->payload);
+        ESP_LOGE(TAG, "CME ERROR %s", (char*)event->payload);
     }
     default:
         break;
@@ -91,7 +93,7 @@ void app_main()
     
     esp_sara_mqtt_client_config_t mqtt_config = {};
     mqtt_config.client_id = "dytrax";
-    mqtt_config.host = "66.42.48.129";
+    mqtt_config.host = "127.0.0.1";
     mqtt_config.port = 1883;
     mqtt_config.timeout = 120;
     mqtt_config.clean_session = false;
