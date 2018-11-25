@@ -5,6 +5,15 @@
 #include "driver/uart.h"
 #include "esp_log.h"
 #include <freertos/event_groups.h>
+#include <Arduino.h>
+
+#if PLATFORMIO_BUILD
+#define SARA_AT_INFO(...) printf(__VA_ARGS__)
+#define SARA_AT_ERROR(...) printf(__VA_ARGS__)
+#else
+#define SARA_AT_INFO(...) ESP_LOGI(TAG, __VA_ARGS__)
+#define SARA_AT_ERROR(...) ESP_LOGE(TAG, __VA_ARGS__)
+#endif
 
 QueueHandle_t at_queue;
 SemaphoreHandle_t uart_semaphore;

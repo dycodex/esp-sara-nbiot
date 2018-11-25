@@ -141,7 +141,7 @@ void esp_sara_mqtt_task(void *param)
     {
         if (client->cgatt == 1)
         {
-            ESP_LOGI(TAG, "login state %d", client->mqtt_state);
+            SARA_AT_INFO("login state %d\n", client->mqtt_state);
             if (client->mqtt_state == SARA_MQTT_DISCONNECTED)
             {
                 esp_sara_config_mqtt(client);
@@ -171,14 +171,14 @@ void esp_sara_task(void *param)
     {
         err = esp_sara_check_modem();
         if (err == ESP_ERR_TIMEOUT)
-            ESP_LOGE(TAG, "Modem timeout. Retry...");
+            SARA_AT_ERROR("Modem timeout. Retry...\n");
     }
 
     while (err != ESP_OK)
     {
         err = esp_sara_check_sim();
         if (err == ESP_ERR_TIMEOUT)
-            ESP_LOGE(TAG, "Modem timeout. Retry...");
+            SARA_AT_ERROR("Modem timeout. Retry...\n");
     }
 
     int no_signal_counter = 0;
@@ -233,7 +233,7 @@ static void esp_sara_event_task(void *param)
         char rc[SARA_BUFFER_SIZE];
         if (xQueueReceive(at_queue, &rc, 1000) == pdPASS)
         {
-            ESP_LOGI(TAG, "%s", rc);
+            SARA_AT_INFO("%s\n", rc);
             char *ch = strtok(rc, " ");
 
             ESP_RESP_NULL_CHECK(ch, continue);
@@ -413,20 +413,20 @@ static void esp_sara_event_task(void *param)
 
                     int num_messages = atoi(ch);
 
-                    ESP_LOGI(TAG, "%d messages", num_messages);
+                    SARA_AT_INFO("%d messages\n", num_messages);
                     for (int i = 0; i < num_messages; i++)
                     {
                         ch = strtok(NULL, "\r\n");
                         ESP_RESP_NULL_CHECK(ch, esp_sara_mqtt_read_message());
 
-                        ESP_LOGI(TAG, "topic %s", ch + 6);
+                        SARA_AT_INFO("topic %s\n", ch + 6);
                         memset(event.topic, '\0', 64);
                         strcpy((char *)event.topic, ch + 6);
 
                         ch = strtok(NULL, "\r\n");
                         ESP_RESP_NULL_CHECK(ch, continue);
 
-                        ESP_LOGI(TAG, "msg %s", ch + 4);
+                        SARA_AT_INFO("msg %s\n", ch + 4);
 
                         strcpy((char *)event.payload, ch + 4);
                         event.payload_size = strlen((char *)event.payload);
@@ -467,7 +467,7 @@ static void esp_sara_event_task(void *param)
                 ch = strtok(NULL, "\r\n");
                 ESP_RESP_NULL_CHECK(ch, continue);
 
-                ESP_LOGE(TAG, "%s", ch);
+                SARA_AT_ERROR("%s", ch);
 
                 event.event_id = SARA_EVENT_CME_ERROR;
                 strcpy((char *)event.payload, ch);

@@ -47,11 +47,11 @@ static void esp_sara_read_at_response(void *param)
 
             if (len > 2)
             {
-                ESP_LOGI(TAG, "%d %s", len, message);
+                SARA_AT_INFO("%d %s\n", len, message);
 
                 if (xQueueSendToBack(at_queue, (void *)&message, 1000) == pdFAIL)
                 {
-                    ESP_LOGE(TAG, "Send to queue failed");
+                    SARA_AT_ERROR("Send to queue failed\n");
                 }
             }
         }
@@ -76,7 +76,7 @@ static esp_err_t esp_sara_wait_irc(int timeout)
             uint8_t data[64] = {'\0'};
             uart_read_bytes(SARA_UART_NUM, (uint8_t *)data, length, timeout / portTICK_PERIOD_MS);
             strcat(message, (const char *)data);
-            ESP_LOGI(TAG, "%s", data);
+            SARA_AT_INFO("%s", data);
 
             if (message[strlen(message) - 1] == '\n')
             {
@@ -115,7 +115,7 @@ static esp_err_t esp_sara_wait_irc(int timeout)
             rc[len] = '\0';
             if (xQueueSendToBack(at_queue, (void *)&rc, 1000 / portTICK_PERIOD_MS) == pdFAIL)
             {
-                ESP_LOGE(TAG, "Send to queue failed");
+                SARA_AT_ERROR("Send to queue failed\n");
             }
         }
 
@@ -124,7 +124,7 @@ static esp_err_t esp_sara_wait_irc(int timeout)
 
     if (err != ESP_OK)
     {
-        ESP_LOGE(TAG, "AT Command Error");
+        SARA_AT_ERROR("AT Command Error\n");
     }
     return err;
 }
@@ -137,7 +137,7 @@ esp_err_t esp_sara_send_at_command(const char *command, int len, int timeout)
         char *TAG = "SARA_TX";
         uart_wait_tx_done(SARA_UART_NUM, timeout / portTICK_PERIOD_MS);
         uart_write_bytes(SARA_UART_NUM, command, len);
-        ESP_LOGI(TAG, "%s", command);
+        SARA_AT_INFO("%s", command);
         err = esp_sara_wait_irc(timeout);
     }
     return err;
@@ -160,7 +160,7 @@ void esp_sara_uart_init()
     at_queue = xQueueCreate(10, SARA_BUFFER_SIZE);
     uart_semaphore = xSemaphoreCreateMutex();
     xTaskCreate(esp_sara_read_at_response, "sara_rx_task", 4096, NULL, 4, &uart_task_handle);
-    ESP_LOGI(TAG, "esp_sara_uart_client_handle_t init");
+    SARA_AT_INFO("esp_sara_uart_client_handle_t init");
 }
 
 esp_err_t esp_sara_disable_echo()
