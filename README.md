@@ -48,7 +48,7 @@ example configuration of esp_sara_mqtt_client_config_t
 ```
 esp_sara_mqtt_client_config_t mqtt_config = {
     .client_id = "dytrax",
-    .host = "66.42.48.129",
+    .host = "127.0.0.1",
     .port = 1883,
     .timeout = 120,
     .clean_session = false,
