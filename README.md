@@ -48,7 +48,7 @@ example configuration of esp_sara_mqtt_client_config_t
 ```
 esp_sara_mqtt_client_config_t mqtt_config = {
     .client_id = "dytrax",
-    .host = "66.42.48.129",
+    .host = "127.0.0.1",
     .port = 1883,
     .timeout = 120,
     .clean_session = false,
@@ -116,9 +116,9 @@ static esp_err_t sara_event_handle(esp_sara_event_handle_t *event)
     {
         ESP_LOGI(TAG, "MQTT_CONNECTED");
         mqtt_connected = true;
-        esp_sara_subscribe_mqtt(client, "/test/rx", 1);
-        esp_sara_publish_mqtt(sara, "/test/tx", "test, false, 1, 0);
+        esp_sara_subscribe_mqtt(client, "generic_brand_617/generic_device/v1nm/common", 1);
     }
+    break;
     case SARA_EVENT_MQTT_DATA:
     {
         ESP_LOGI(TAG, "MQTT_DATA");
@@ -135,6 +135,15 @@ static esp_err_t sara_event_handle(esp_sara_event_handle_t *event)
         ESP_LOGE(TAG, "MQTT_PUBLISHED_FAILED");
     }
     break;
+    case SARA_EVENT_MQTT_ERR:
+    {
+        ESP_LOGE(TAG, "MQTT ERROR %d %d", *(int*) event->payload, *(int*)(event->payload + 4));
+    }
+    break;
+    case SARA_EVENT_CME_ERROR:
+    {
+        ESP_LOGE(TAG, "CME ERROR %s", (char*)event->payload);
+    }
     default:
         break;
     }
@@ -143,14 +152,14 @@ static esp_err_t sara_event_handle(esp_sara_event_handle_t *event)
 
 esp_sara_mqtt_client_config_t mqtt_config = {
     .client_id = "dytrax",
-    .host = "66.42.48.129",
+    .host = "127.0.0.1",
     .port = 1883,
     .timeout = 120,
     .clean_session = false,
 };
 
 esp_sara_client_config_t config = {
-    .apn = "test.m2m.indosat.com",
+    .apn = "internet",
     .rat = 8,
     .use_hex = false,
     .transport = SARA_TRANSPORT_MQTT,
