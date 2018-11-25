@@ -4,7 +4,7 @@
 #include "esp_err.h"
 #include "driver/uart.h"
 #include "esp_log.h"
-#include "freeRTOS/event_groups.h"
+#include <freertos/event_groups.h>
 
 QueueHandle_t at_queue;
 SemaphoreHandle_t uart_semaphore;

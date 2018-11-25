@@ -2,7 +2,7 @@
 #include "esp_sara_config.h"
 #include "esp_sara_at.h"
 #include "esp_sara_nbiot.h"
-#include "freeRTOS/FreeRTOS.h"
+#include "freertos/FreeRTOS.h"
 #include "string.h"
 
 #define ESP_RESP_NULL_CHECK(x, action) \
