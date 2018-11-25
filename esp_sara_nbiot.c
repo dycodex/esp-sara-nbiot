@@ -31,7 +31,8 @@ typedef enum
 typedef enum
 {
     SARA_MQTT_DISCONNECTED = 0,
-    SARA_MQTT_CONNECTED
+    SARA_MQTT_CONNECTED,
+    SARA_MQTT_CONNECTING
 } esp_sara_mqtt_state_t;
 
 typedef enum
@@ -346,9 +347,17 @@ static void esp_sara_event_task(void *param)
 
                 if (result == 0)
                     esp_sara_get_mqtt_error();
-        
+
                 switch (op)
                 {
+                case SARA_UMQTTC_OP_LOGIN:
+                {
+                    if (result)
+                    {
+                        client->mqtt_state = SARA_MQTT_CONNECTING;
+                    }
+                }
+                break;
                 case SARA_UMQTTC_OP_PUBLISH:
                 {
                     if (result)
@@ -358,7 +367,6 @@ static void esp_sara_event_task(void *param)
                     else
                     {
                         event.event_id = SARA_EVENT_PUBLISH_FAILED;
-                        esp_sara_get_mqtt_error();
                     }
                     should_callback = true;
                 }
@@ -381,8 +389,8 @@ static void esp_sara_event_task(void *param)
                 {
                     if (result == 0)
                     {
-                        esp_sara_logout_mqtt(client);
-                        esp_sara_login_mqtt(client);
+                        //esp_sara_logout_mqtt(client);
+                        //esp_sara_login_mqtt(client);
                     }
                 }
                 break;
@@ -451,7 +459,7 @@ static void esp_sara_event_task(void *param)
                 *(int *)(event.payload + 4) = supl_err;
 
                 event.payload_size = 2 * sizeof(int);
-
+                event.event_id = SARA_EVENT_MQTT_ERR;
                 should_callback = err != 0;
             }
             else if (strstr(ch, "+CME ERROR:") != NULL)
